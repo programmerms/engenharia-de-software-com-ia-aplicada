@@ -1,0 +1,932 @@
+Vamos montar um exemplo didático completo, mas sem colocar ainda banco, Redis, WhatsApp ou LLM real. A ideia é enxergar claramente o caminho:
+
+Mensagem do cliente
+       ↓
+LLM interpreta
+       ↓
+Structured Output
+       ↓
+State
+       ↓
+LangGraph
+       ↓
+Router
+       ↓
+Nó correspondente
+
+
+Vou montar como se fosse uma pequena aplicação do nosso delivery.
+
+CREATE_ORDER
+CANCEL_ORDER
+ORDER_STATUS
+
+
+E teremos estes nós:
+
+START
+  ↓
+identify_intent
+  ↓
+route_intent
+  ├── create_order
+  ├── cancel_order
+  └── order_status
+        ↓
+     response
+        ↓
+       END
+       
+       
+       
+A estrutura poderia ser:
+
+delivery/
+│
+├── src/
+│   └── delivery/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── models.py
+│       ├── llm.py
+│       ├── state.py
+│       ├── nodes.py
+│       ├── router.py
+│       └── graph.py
+│
+└── run.py
+
+Agora vamos entender cada arquivo.
+
+2. Classe de configuração
+
+Primeiro criamos nossa configuração.
+
+config.py
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class LangGraphConfig:
+    """
+    Configurações utilizadas na construção do fluxo LangGraph.
+
+    A ideia é centralizar informações que podem variar
+    entre ambientes ou entre diferentes fluxos.
+    """
+
+    graph_name: str = "delivery_assistant"
+
+    create_order_node: str = "create_order"
+    cancel_order_node: str = "cancel_order"
+    order_status_node: str = "order_status"
+    response_node: str = "response"
+
+
+
+Aqui ainda não temos nada "inteligente".
+
+É apenas configuração.
+
+Podemos criar:
+
+config = LangGraphConfig()
+
+E acessar:
+
+config.graph_name
+
+Resultado:
+
+delivery_assistant
+
+
+3. Agora precisamos definir o que a IA pode devolver
+
+Essa é uma das partes mais importantes.
+
+
+
+models.py
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+Intent = Literal[
+    "create_order",
+    "cancel_order",
+    "order_status",
+    "unknown",
+]
+
+
+class Product(BaseModel):
+    """
+    Representa um produto identificado na mensagem do cliente.
+    """
+
+    name: str
+    quantity: int = Field(gt=0)
+
+
+class IntentResult(BaseModel):
+    """
+    Contrato da resposta produzida pela IA.
+
+    O LLM pode interpretar diferentes formas de linguagem,
+    mas a aplicação trabalha somente com os valores definidos
+    neste contrato.
+    """
+
+    intent: Intent
+
+    products: list[Product] = Field(default_factory=list)
+
+    order_id: int | None = None
+
+
+
+Agora temos nosso contrato.
+
+A IA pode receber:
+
+"Quero duas pizzas de calabresa e uma coca."
+
+Mas precisa produzir algo equivalente a:
+
+IntentResult(
+    intent="create_order",
+    products=[
+        Product(
+            name="pizza de calabresa",
+            quantity=2
+        ),
+        Product(
+            name="coca-cola",
+            quantity=1
+        )
+    ]
+)
+
+
+
+4. Agora criamos nosso State
+state.py
+from typing import TypedDict
+
+from delivery.models import Product
+
+
+class DeliveryState(TypedDict, total=False):
+    """
+    Estado compartilhado por todos os nós do LangGraph.
+
+    Cada nó pode ler informações existentes e devolver
+    novas informações para serem incorporadas ao estado.
+    """
+
+    # Mensagem original recebida do cliente
+    message: str
+
+    # Intenção identificada pela IA
+    intent: str
+
+    # Produtos identificados
+    products: list[Product]
+
+    # Identificador do pedido
+    order_id: int | None
+
+    # Resultado da operação
+    success: bool
+
+    # Resposta final para o cliente
+    response: str
+
+
+
+Agora temos algo parecido com o nosso GraphState do projeto médico.
+
+Imagine:
+
+DeliveryState
+────────────────────────
+message
+intent
+products
+order_id
+success
+response
+
+Esse estado vai viajar pelo grafo.
+
+
+
+5. Agora precisamos da IA
+
+Aqui está uma parte que precisamos separar muito bem.
+
+llm.py
+
+Para fins didáticos, vamos simular a IA primeiro.
+
+from delivery.models import IntentResult, Product
+
+
+class DeliveryLLM:
+    """
+    Simula a camada responsável pela interpretação da linguagem natural.
+
+    No projeto real, esta classe será substituída por uma integração
+    com LangChain + um modelo LLM.
+    """
+
+    def interpret(self, message: str) -> IntentResult:
+        """
+        Interpreta a mensagem do cliente e devolve uma estrutura
+        compatível com o contrato IntentResult.
+
+        Nesta versão didática não estamos chamando um LLM real.
+        """
+
+        message_lower = message.lower()
+
+        if "cancelar" in message_lower:
+            return IntentResult(
+                intent="cancel_order",
+                order_id=123
+            )
+
+        if "status" in message_lower:
+            return IntentResult(
+                intent="order_status",
+                order_id=123
+            )
+
+        if "pizza" in message_lower:
+            return IntentResult(
+                intent="create_order",
+                products=[
+                    Product(
+                        name="pizza de calabresa",
+                        quantity=2
+                    ),
+                    Product(
+                        name="coca-cola",
+                        quantity=1
+                    )
+                ]
+            )
+
+        return IntentResult(
+            intent="unknown"
+        )
+
+
+
+⚠️ Atenção para não confundir.
+
+Essa classe ainda não está usando LLM.
+
+Estamos simulando:
+
+LLM
+
+para podermos primeiro entender o fluxo.
+
+Depois substituímos o conteúdo por:
+
+LangChain → LLM → Structured Output
+
+sem precisar mudar o LangGraph.
+
+Essa separação é proposital.
+
+
+
+6. Agora criamos os nós
+
+
+nodes.py
+from delivery.llm import DeliveryLLM
+from delivery.state import DeliveryState
+
+
+llm = DeliveryLLM()
+
+
+def identify_intent(state: DeliveryState) -> DeliveryState:
+    """
+    Primeiro nó do fluxo.
+
+    Recebe a mensagem do cliente e solicita à camada de IA
+    que interprete a intenção e extraia os dados relevantes.
+    """
+
+    result = llm.interpret(state["message"])
+
+    return {
+        "intent": result.intent,
+        "products": result.products,
+        "order_id": result.order_id,
+    }
+
+
+def create_order(state: DeliveryState) -> DeliveryState:
+    """
+    Nó responsável pela criação do pedido.
+
+    Em uma aplicação real, aqui chamaríamos um serviço de domínio
+    que poderia consultar produtos e gravar o pedido no MySQL.
+    """
+
+    print("Criando pedido...")
+
+    return {
+        "success": True,
+        "response": "Pedido criado com sucesso!"
+    }
+
+
+def cancel_order(state: DeliveryState) -> DeliveryState:
+    """
+    Nó responsável pelo cancelamento do pedido.
+    """
+
+    print(f"Cancelando pedido {state.get('order_id')}...")
+
+    return {
+        "success": True,
+        "response": "Pedido cancelado com sucesso!"
+    }
+
+
+def order_status(state: DeliveryState) -> DeliveryState:
+    """
+    Nó responsável pela consulta do status do pedido.
+    """
+
+    print(f"Consultando pedido {state.get('order_id')}...")
+
+    return {
+        "success": True,
+        "response": "Seu pedido está sendo preparado."
+    }
+
+
+def response_node(state: DeliveryState) -> DeliveryState:
+    """
+    Nó final responsável por preparar a resposta ao cliente.
+
+    Futuramente podemos utilizar outro LLM aqui para humanizar
+    a resposta.
+    """
+
+    return {
+        "response": state.get(
+            "response",
+            "Não consegui entender sua solicitação."
+        )
+    }
+
+Agora temos nossos nós:
+
+identify_intent
+create_order
+cancel_order
+order_status
+response
+
+
+7. Agora vem o Router
+
+
+router.py
+from delivery.state import DeliveryState
+
+
+def route_intent(state: DeliveryState) -> str:
+    """
+    Decide qual caminho do grafo deve ser executado
+    com base na intenção identificada pela IA.
+    """
+
+    intent = state.get("intent", "unknown")
+
+    if intent == "create_order":
+        return "create_order"
+
+    if intent == "cancel_order":
+        return "cancel_order"
+
+    if intent == "order_status":
+        return "order_status"
+
+    return "response"
+
+Perceba a responsabilidade.
+
+O Router não interpreta português.
+
+Ele não sabe:
+
+"quero pedir uma pizza"
+"gostaria de comprar"
+"manda duas pizzas"
+
+Nada disso.
+
+Ele só conhece:
+
+create_order
+cancel_order
+order_status
+unknown
+
+Essa informação já veio da IA.
+
+8. Agora finalmente construímos o LangGraph
+
+
+graph.py
+from langgraph.graph import END, START, StateGraph
+
+from delivery.nodes import (
+    identify_intent,
+    create_order,
+    cancel_order,
+    order_status,
+    response_node,
+)
+from delivery.router import route_intent
+from delivery.state import DeliveryState
+
+
+def build_graph():
+    """
+    Constrói e compila o fluxo LangGraph da aplicação.
+    """
+
+    workflow = StateGraph(DeliveryState)
+
+    # ---------------------------------------------------------
+    # Nós
+    # ---------------------------------------------------------
+
+    workflow.add_node(
+        "identify_intent",
+        identify_intent
+    )
+
+    workflow.add_node(
+        "create_order",
+        create_order
+    )
+
+    workflow.add_node(
+        "cancel_order",
+        cancel_order
+    )
+
+    workflow.add_node(
+        "order_status",
+        order_status
+    )
+
+    workflow.add_node(
+        "response",
+        response_node
+    )
+
+    # ---------------------------------------------------------
+    # Entrada
+    # ---------------------------------------------------------
+
+    workflow.add_edge(
+        START,
+        "identify_intent"
+    )
+
+    # ---------------------------------------------------------
+    # Roteamento condicional
+    # ---------------------------------------------------------
+
+    workflow.add_conditional_edges(
+        "identify_intent",
+        route_intent,
+        {
+            "create_order": "create_order",
+            "cancel_order": "cancel_order",
+            "order_status": "order_status",
+            "response": "response",
+        }
+    )
+
+    # ---------------------------------------------------------
+    # Final dos fluxos
+    # ---------------------------------------------------------
+
+    workflow.add_edge(
+        "create_order",
+        "response"
+    )
+
+    workflow.add_edge(
+        "cancel_order",
+        "response"
+    )
+
+    workflow.add_edge(
+        "order_status",
+        "response"
+    )
+
+    workflow.add_edge(
+        "response",
+        END
+    )
+
+    return workflow.compile()
+
+
+graph = build_graph()
+
+
+Agora temos efetivamente um LangGraph.
+
+9. Visualmente nosso grafo ficou assim
+                    START
+                      │
+                      ▼
+             ┌─────────────────┐
+             │ identify_intent │
+             │                 │
+             │      LLM        │
+             └────────┬────────┘
+                      │
+                      ▼
+               ┌─────────────┐
+               │ route_intent│
+               └──────┬──────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+   create_order   cancel_order   order_status
+        │             │             │
+        └─────────────┼─────────────┘
+                      │
+                      ▼
+                ┌──────────┐
+                │ response │
+                └────┬─────┘
+                     │
+                     ▼
+                    END
+                    
+                    
+10. Agora vamos executar
+
+run.py
+from delivery.graph import graph
+
+
+def main():
+    """
+    Executa o fluxo do delivery com uma mensagem de exemplo.
+    """
+
+    state = {
+        "message": (
+            "Boa tarde, quero duas pizzas de calabresa "
+            "e uma coca-cola."
+        )
+    }
+
+    result = graph.invoke(state)
+
+    print(result)
+
+
+if __name__ == "__main__":
+    main()
+
+Quando executarmos:
+
+Boa tarde, quero duas pizzas...
+
+acontece:
+
+run.py
+   │
+   ▼
+graph.invoke()
+   │
+   ▼
+identify_intent
+   │
+   ▼
+DeliveryLLM
+   │
+   ▼
+IntentResult
+   │
+   ▼
+intent = create_order
+   │
+   ▼
+route_intent
+   │
+   ▼
+create_order
+   │
+   ▼
+response
+   │
+   ▼
+END
+
+11. Agora vem a parte que você estava tentando entender
+
+Vamos parar o programa exatamente depois do identify_intent.
+
+O estado seria algo parecido com:
+
+{
+    "message": "Boa tarde, quero duas pizzas de calabresa e uma coca-cola.",
+
+    "intent": "create_order",
+
+    "products": [
+        {
+            "name": "pizza de calabresa",
+            "quantity": 2
+        },
+        {
+            "name": "coca-cola",
+            "quantity": 1
+        }
+    ]
+}
+
+E então:
+
+route_intent(state)
+
+recebe:
+
+state["intent"]
+
+que contém:
+
+create_order
+
+E retorna:
+
+create_order
+
+Então o LangGraph sabe:
+
+"create_order"
+      ↓
+execute o nó
+"create_order"
+
+12. Olha a relação entre as coisas
+
+Essa é a imagem mental que quero que você guarde:
+
+                 LLM
+                  │
+                  │ interpreta
+                  ▼
+        ┌───────────────────┐
+        │ intent =          │
+        │ "create_order"    │
+        └─────────┬─────────┘
+                  │
+                  ▼
+             GraphState
+                  │
+                  ▼
+            route_intent()
+                  │
+                  │ retorna
+                  ▼
+          "create_order"
+                  │
+                  ▼
+          LangGraph procura
+          esse caminho/nó
+                  │
+                  ▼
+        ┌─────────────────┐
+        │ create_order    │
+        │     NODE        │
+        └─────────────────┘
+
+Essa é a ligação.
+
+Não existe uma "mágica" em que a IA descobre o nó.
+
+Nós construímos o contrato:
+
+intent
+   ↓
+valor permitido
+   ↓
+rota
+   ↓
+nó
+
+13. E agora vem a melhor parte: trocar nossa IA fake pela IA real
+
+Hoje temos:
+
+class DeliveryLLM:
+
+    def interpret(self, message):
+        ...
+
+E internamente fizemos:
+
+if "pizza" in message:
+
+Isso foi só para aprender.
+
+A versão real poderia conceitualmente ser:
+
+from langchain_openai import ChatOpenAI
+
+
+class DeliveryLLM:
+
+    def __init__(self):
+
+        self.model = ChatOpenAI(
+            model="..."
+        )
+
+        self.structured_model = self.model.with_structured_output(
+            IntentResult
+        )
+
+    def interpret(self, message: str) -> IntentResult:
+
+        return self.structured_model.invoke(
+            [
+                {
+                    "role": "system",
+                    "content": """
+                    Você é o interpretador de intenções
+                    de um sistema de delivery.
+
+                    Identifique a intenção do cliente.
+
+                    As intenções permitidas são:
+
+                    create_order
+                    cancel_order
+                    order_status
+                    unknown
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
+        )
+
+Agora sim:
+
+Cliente
+   │
+   ▼
+LangChain
+   │
+   ▼
+LLM
+   │
+   ▼
+Structured Output
+   │
+   ▼
+IntentResult
+
+E nosso restante continua praticamente igual:
+
+IntentResult
+      ↓
+DeliveryState
+      ↓
+route_intent()
+      ↓
+LangGraph
+      ↓
+create_order
+14. E isso explica por que eu quero que você aprenda nessa ordem
+
+Olha a evolução:
+
+Etapa 1 — nosso projeto médico
+Python
+ ↓
+regex
+ ↓
+intent
+ ↓
+LangGraph
+Etapa 2
+LangChain
+ ↓
+LLM
+ ↓
+Structured Output
+ ↓
+intent
+ ↓
+LangGraph
+Etapa 3
+LangChain
+ ↓
+LLM
+ ↓
+intent + dados
+ ↓
+LangGraph
+ ↓
+Node
+ ↓
+Tool
+ ↓
+MySQL
+
+Etapa 4 — nosso Delivery
+WhatsApp
+   ↓
+FastAPI
+   ↓
+Redis
+   ↓
+LangGraph
+   ↓
+LangChain
+   ↓
+LLM
+   ↓
+Structured Output
+   ↓
+Intent
+   ↓
+Router
+   ↓
+Node
+   ↓
+Service Python
+   ↓
+MySQL
+
+E aí, parceiro, começa a aparecer aquela arquitetura IA-FIRST que nós desenhamos lá atrás.
+
+O mais importante agora é você perceber que não é o LLM que "chama o nó".
+
+É:
+
+                 ┌──────────────┐
+                 │     LLM      │
+                 │              │
+                 │ INTERPRETA   │
+                 └──────┬───────┘
+                        │
+                        ▼
+                  IntentResult
+                        │
+                        ▼
+                  GraphState
+                        │
+                        ▼
+                 ┌──────────────┐
+                 │  LangGraph   │
+                 │              │
+                 │  ORQUESTRA   │
+                 └──────┬───────┘
+                        │
+                        ▼
+                     Router
+                        │
+             ┌──────────┼──────────┐
+             ▼          ▼          ▼
+           Pedido     Cancelar    Status
+             │          │          │
+             ▼          ▼          ▼
+            NODE       NODE       NODE
+
+LLM = "o que o cliente quer?"
+
+Router = "qual caminho corresponde a isso?"
+
+Node = "execute a operação."
+
+Essa separação é a base para construirmos nosso agente de delivery sem transformar a IA em dona das regras de negócio.       

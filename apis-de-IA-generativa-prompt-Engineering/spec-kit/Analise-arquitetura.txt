@@ -1,0 +1,380 @@
+Quero iniciar a transposição para Python da nova aula do curso.
+
+O projeto de referência TypeScript está em:
+
+../versao-typescript
+
+Meu projeto Python base é o diretório atual.
+
+Antes de implementar qualquer coisa:
+
+1. Analise completamente o projeto TypeScript de referência.
+2. Identifique:
+   - arquitetura;
+   - dependências;
+   - configuração do LLM;
+   - OpenRouter;
+   - prompts;
+   - schemas Zod;
+   - Structured Output;
+   - GraphState;
+   - nós do LangGraph;
+   - conditional edges;
+   - services;
+   - fluxo de execução;
+   - testes;
+   - tratamento de erros.
+3. Analise também o projeto Python atual.
+4. Identifique quais partes do template Python devem ser preservadas.
+5. Identifique quais partes devem ser substituídas ou evoluídas.
+6. Não altere nenhum arquivo.
+7. Não implemente código.
+8. Produza apenas um relatório comparativo TypeScript → Python.
+
+O objetivo desta etapa é preparar a especificação da nova feature usando SpecKit.
+
+
+
+
+Especificação:
+
+Criar a especificação da feature 004-medical-appointment-llm.
+
+Objetivo:
+
+Evoluir o projeto Python atual de Medical Appointment para incorporar
+os conceitos de IA apresentados na nova aula, transpondo para Python
+o comportamento relevante do projeto TypeScript de referência:
+
+../versao-typescript
+
+O projeto TypeScript deve ser tratado exclusivamente como referência.
+Não modificar nenhum arquivo do diretório ../versao-typescript.
+
+A implementação Python deve preservar a finalidade didática do projeto
+e manter a arquitetura técnica já estabelecida no template Python.
+
+CONCEITOS DA NOVA AULA QUE DEVEM SER INCORPORADOS:
+
+1. Integração real com um LLM através do LangChain.
+2. Configuração de modelo e provider através de variáveis de ambiente.
+3. Integração com OpenRouter.
+4. Serviço dedicado para comunicação com o LLM.
+5. Structured Output.
+6. Schema estruturado utilizando Pydantic.
+7. Identificação de intenção utilizando LLM.
+8. Extração estruturada dos dados necessários para o agendamento.
+9. Utilização do resultado estruturado pelo LangGraph.
+10. Conditional Edge baseado na intenção identificada.
+11. Nó de agendamento.
+12. Nó de cancelamento.
+13. Nó de geração de mensagem.
+14. Geração da resposta final utilizando LLM.
+15. Separação entre:
+    - configuração;
+    - serviço de LLM;
+    - prompts;
+    - estado do LangGraph;
+    - nodes;
+    - construção do graph;
+    - serviço de domínio.
+16. Injeção de dependências quando aplicável.
+17. Testes determinísticos sem depender obrigatoriamente de chamadas reais
+    ao LLM.
+18. Teste de integração opcional para o provider real, isolado dos testes
+    unitários.
+
+INTENÇÃO DO FLUXO:
+
+A mensagem do usuário deve ser enviada para um nó de identificação de
+intenção.
+
+Esse nó deve utilizar LangChain + LLM + Structured Output.
+
+O resultado deve utilizar um conjunto controlado de intenções:
+
+- schedule
+- cancel
+- unknown
+
+A IA pode interpretar diferentes formas de linguagem natural, mas o
+resultado consumido pela aplicação deve respeitar esse contrato.
+
+Exemplos:
+
+"Quero marcar uma consulta"
+"Gostaria de agendar uma consulta"
+"Preciso consultar um médico"
+
+devem poder ser interpretados como:
+
+schedule
+
+Da mesma forma, diferentes formas de solicitar cancelamento devem resultar
+em:
+
+cancel
+
+O resultado da IA não deve ser utilizado para executar diretamente regras
+de negócio.
+
+O resultado estruturado deve ser colocado no estado do LangGraph.
+
+O LangGraph deve utilizar esse estado para decidir o próximo nó.
+
+FLUXO ESPERADO:
+
+START
+  ↓
+identify_intent
+  ↓
+conditional routing
+  ├── schedule → scheduler
+  ├── cancel   → canceller
+  └── unknown/error → message
+                         ↑
+scheduler ───────────────┤
+canceller ───────────────┘
+                         ↓
+                      END
+
+O nó scheduler deve utilizar um serviço de domínio para realizar o
+agendamento.
+
+O nó canceller deve utilizar o mesmo serviço de domínio para realizar o
+cancelamento.
+
+O nó message deve utilizar o LLM para gerar uma resposta natural ao
+usuário baseada no resultado da operação.
+
+REQUISITOS DE ARQUITETURA:
+
+Preservar Poetry e o ambiente Python local já utilizado pelo projeto.
+
+Preservar Python 3.13.x.
+
+Preservar LangChain, LangGraph e FastAPI já existentes no template.
+
+Não introduzir banco de dados real nesta feature.
+
+O serviço de agendamento deve permanecer em memória, conforme a finalidade
+didática do projeto de referência.
+
+As credenciais do provider não podem ser armazenadas no código.
+
+Utilizar .env/.env.example para configuração.
+
+Não hardcodar API keys.
+
+O código Python deve seguir uma arquitetura clara e didática.
+
+As classes, funções e nodes devem possuir comentários/docstrings explicando
+sua responsabilidade.
+
+IMPORTANTE:
+
+Não copiar literalmente a estrutura TypeScript.
+
+Transpor conceitos e comportamentos para Python utilizando as convenções
+apropriadas da linguagem.
+
+Não preservar comportamentos do antigo exercício que sejam específicos da
+implementação anterior e que não façam parte da nova aula.
+
+Não implementar código nesta etapa.
+
+Produzir:
+- spec.md
+- checklist de requisitos
+- critérios de aceitação
+- requisitos funcionais;
+- requisitos não funcionais;
+- escopo;
+- fora de escopo;
+- riscos e decisões relevantes.
+
+REQUISITO DE DOCUMENTAÇÃO E DIDÁTICA:
+
+Todo código implementado nesta feature deve possuir documentação didática
+suficiente para permitir o entendimento do fluxo por um estudante que está
+aprendendo LangChain, LangGraph e integração com LLMs.
+
+Regras:
+
+1. Todas as classes criadas ou modificadas devem possuir docstring
+   explicando:
+   - sua responsabilidade;
+   - qual parte da arquitetura representa;
+   - como participa do fluxo da aplicação.
+
+2. Todos os métodos e funções criados ou modificados devem possuir
+   docstring explicando:
+   - o que fazem;
+   - quais são seus parâmetros;
+   - o que retornam;
+   - quando aplicável, quais erros podem ocorrer.
+
+3. Os pontos importantes do fluxo devem possuir comentários explicativos,
+   especialmente:
+   - integração com LangChain;
+   - configuração do LLM;
+   - Structured Output;
+   - schemas Pydantic;
+   - GraphState;
+   - criação e compilação do StateGraph;
+   - conditional edges;
+   - routers;
+   - nodes;
+   - injeção de dependências;
+   - chamadas ao serviço de domínio;
+   - geração da resposta final pelo LLM.
+
+4. Os comentários devem explicar o "porquê" da implementação e não apenas
+   repetir o código.
+
+5. A documentação deve ser didática e adequada ao contexto de aprendizado
+   da pós-graduação.
+
+6. Não utilizar comentários excessivos em linhas óbvias de código.
+   A documentação deve se concentrar nos conceitos e decisões arquiteturais.
+
+7. Sempre que uma abstração do LangChain ou LangGraph for utilizada,
+   explicar brevemente sua finalidade no contexto deste projeto.
+
+8. O código deve permitir acompanhar o fluxo:
+
+   entrada do usuário
+       ↓
+   identify_intent
+       ↓
+   LLM
+       ↓
+   Structured Output
+       ↓
+   GraphState
+       ↓
+   conditional routing
+       ↓
+   scheduler/canceller
+       ↓
+   message generator
+       ↓
+   LLM
+       ↓
+   resposta final
+
+9. Quando houver uma decisão arquitetural importante, adicionar comentário
+   explicando a razão da decisão.
+
+10. A documentação deve permanecer em português, acompanhando o idioma
+    utilizado na documentação do projeto.
+    
+    
+    
+    
+*********************Planejamento***********************************************************************
+
+
+/speckit.plan
+
+Elaborar o plano técnico para implementar a feature 004-medical-appointment-llm.
+
+Usar como fontes:
+
+1. A especificação da feature.
+2. O projeto Python atual.
+3. O projeto TypeScript de referência.
+
+O plano deve definir explicitamente:
+
+1. Estrutura de diretórios Python.
+2. Classes necessárias.
+3. Responsabilidade de cada classe.
+4. Modelos Pydantic necessários.
+5. GraphState.
+6. Serviço de LLM.
+7. Configuração do provider.
+8. Carregamento de variáveis de ambiente.
+9. Prompt templates.
+10. Nó identify_intent.
+11. Nó scheduler.
+12. Nó canceller.
+13. Nó message.
+14. Router/conditional edges.
+15. Factory/build do LangGraph.
+16. Estratégia de injeção de dependências.
+17. Estratégia de testes.
+18. Estratégia para testes sem chamadas reais ao LLM.
+19. Estratégia para teste de integração com LLM real.
+20. Compatibilidade com langgraph.json.
+21. Compatibilidade com FastAPI e CLI existentes.
+
+Para cada decisão arquitetural, explicar brevemente o motivo.
+
+Não implementar código nesta etapa.    
+    
+    
+*************Tarefas*****************************************************************************************
+
+/speckit.tasks    
+
+
+
+************************implementar*************************************************************************
+$speckit-implement
+ 
+Implementar a feature 004-medical-appointment-llm seguindo rigorosamente:
+
+1. specs/004-medical-appointment-llm/spec.md
+2. specs/004-medical-appointment-llm/plan.md
+3. specs/004-medical-appointment-llm/tasks.md
+
+Antes de implementar cada grupo de tarefas:
+
+- consultar a especificação;
+- consultar o plano;
+- consultar o código Python existente;
+- consultar o projeto TypeScript somente como referência.
+
+REGRAS:
+
+1. Implementar em Python.
+2. Não modificar ../versao-typescript.
+3. Preservar o ambiente Poetry existente.
+4. Preservar Python 3.13.x.
+5. Não remover funcionalidades de infraestrutura do template sem justificativa.
+6. Não introduzir dependências desnecessárias.
+7. Usar LangChain para integração com o LLM.
+8. Usar Structured Output com Pydantic.
+9. O LLM deve produzir somente dados pertencentes ao contrato definido.
+10. O LangGraph deve utilizar o resultado estruturado para roteamento.
+11. Nodes devem possuir responsabilidade única.
+12. Regras de negócio não devem ser delegadas ao LLM.
+13. API keys devem vir de variáveis de ambiente.
+14. Não colocar credenciais no código.
+15. Testes unitários não devem depender de internet ou credenciais.
+16. Criar uma implementação fake/mock da fronteira do LLM para testes.
+17. Criar testes do fluxo LangGraph.
+18. Criar teste de integração real somente quando explicitamente previsto
+    no plano.
+19. Manter código didático, com docstrings e comentários nas partes
+    importantes.
+20. Atualizar README explicando o novo fluxo.
+
+Executar as tarefas na ordem definida em tasks.md.
+
+Após cada grupo lógico de tarefas:
+
+- executar os testes;
+- corrigir problemas;
+- verificar lint/type checking caso configurados;
+- verificar poetry check;
+- verificar langgraph validate quando aplicável.
+
+Não marcar uma tarefa como concluída sem verificar sua implementação.
+
+
+
+************************Analisar*************************************************************************
+
+speckit-analyze

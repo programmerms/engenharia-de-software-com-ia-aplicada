@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "langchain-intro-python"
+version = "0.1.0"
+description = "Fluxo didático de intenção e consultas médicas em Python"
+authors = []
+readme = "README.md"
+packages = [{ include = "langchain_intro", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "3.13.12"
+fastapi = "^0.116.0"
+uvicorn = { version = "^0.35.0", extras = ["standard"] }
+langgraph = "^0.6.0"
+langchain-core = "^0.3.0"
+langchain-openai = "^0.3.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+httpx = "^0.28.0"
+langgraph-cli = {extras = ["inmem"], version = "^0.4.31"}
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["llm_integration: requires explicitly enabled real provider credentials"]
+
+[tool.poetry.scripts]
+langchain-intro = "langchain_intro.app:run"
