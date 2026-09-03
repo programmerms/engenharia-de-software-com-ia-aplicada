@@ -1,6 +1,6 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "langchain_intro": "./src/langchain_intro/graph.py:graph"
+    "app": "./src/app/graph/graph.py:graph"
   }
 }

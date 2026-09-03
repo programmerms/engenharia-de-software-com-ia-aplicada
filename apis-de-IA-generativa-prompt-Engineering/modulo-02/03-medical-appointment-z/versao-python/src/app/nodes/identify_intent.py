@@ -4,23 +4,30 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.llm_service import Intent, MedicalLLM
+from app.llm.service import Intent, MedicalLLM
 
 if TYPE_CHECKING:
     from app.state import GraphState
 
 
-def create_identify_intent_node(llm: MedicalLLM):
+def create_identify_intent_node(llm: MedicalLLM, catalog=None):
     """Cria o node que usa LLM estruturado sem executar regras de domínio."""
+
+    catalog_client = catalog
 
     def identify(state: GraphState) -> GraphState:
         """Extrai intenção/dados e devolve uma atualização parcial do estado."""
 
         question = str(state["messages"][-1].content)
-        catalog = state["catalog"]
-        professionals = [{"id": item.id, "name": item.name, "specialty": item.specialty} for item in catalog.professionals]
+        if catalog_client is None:
+            from app.appointment_service import default_catalog
+
+            effective_catalog = default_catalog()
+        else:
+            effective_catalog = catalog_client
+        professionals = [{"id": item.id, "name": item.name, "specialty": item.specialty} for item in effective_catalog.professionals]
         try:
-            extraction = llm.extract_intent(question, professionals, catalog.now())
+            extraction = llm.extract_intent(question, professionals, effective_catalog.now())
             intent = extraction.normalized_intent()
             result: GraphState = {"intent": intent, "visited": ["identify_intent"]}
             if intent == Intent.UNKNOWN.value:

@@ -9,7 +9,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from app.graph import graph, create_medical_state
+from app.graph.graph import create_medical_state, graph
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Medical Appointment Intent Flow")

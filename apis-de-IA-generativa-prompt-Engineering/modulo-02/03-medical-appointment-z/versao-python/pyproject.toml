@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Fluxo didático de intenção e consultas médicas em Python"
 authors = []
 readme = "README.md"
-packages = [{ include = "langchain_intro", from = "src" }]
+packages = [{ include = "app", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "3.13.12"
@@ -30,4 +30,5 @@ pythonpath = ["src"]
 markers = ["llm_integration: requires explicitly enabled real provider credentials"]
 
 [tool.poetry.scripts]
-langchain-intro = "langchain_intro.app:run"
+medical-appointment = "app.app:run"
+langchain-intro = "app.app:run"

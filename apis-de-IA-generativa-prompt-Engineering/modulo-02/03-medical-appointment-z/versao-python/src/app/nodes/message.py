@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from langchain_core.messages import AIMessage
 
-from app.llm_service import MedicalLLM
+from app.llm.service import MedicalLLM
 
 if TYPE_CHECKING:
     from app.state import GraphState

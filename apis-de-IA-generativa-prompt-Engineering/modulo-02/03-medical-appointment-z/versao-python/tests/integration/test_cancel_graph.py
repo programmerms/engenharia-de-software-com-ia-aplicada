@@ -23,7 +23,7 @@ def test_cancel_graph_uses_same_domain_service_and_structured_result() -> None:
         generated=MessageGeneration(message="Cancelamento confirmado para Maria Santos."),
     )
 
-    result = build_graph(llm).invoke(create_medical_state("Quero cancelar", catalog))
+    result = build_graph(llm, catalog).invoke(create_medical_state("Quero cancelar"))
 
     assert result["intent"] == Intent.CANCEL.value
     assert result["action_success"] is True

@@ -1,10 +1,10 @@
-"""Fronteira canônica do serviço LangChain/OpenRouter.
+"""Fachada histórica para a fronteira canônica ``app.llm.service``.
 
-Os símbolos são reexportados do módulo histórico `llm.py` para que a mudança
-de nomenclatura não crie uma segunda implementação do serviço ou dos fakes.
+Os símbolos são reexportados para preservar imports existentes sem duplicar a
+implementação do serviço ou dos fakes.
 """
 
-from app.llm import (
+from app.llm.service import (
     FakeMedicalLLM,
     Intent,
     IntentExtraction,

@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-- Version change: scaffold → 1.0.0
+- Version change: 1.0.0 → 1.1.0
 - Modified principles: none; initial constitution adopted with Principles I–XVII
-- Added sections: Context, Scope and Stage Completion Criteria
+- Added sections: Context, Scope, Stage Completion Criteria and Template Python Architectural Standard
 - Removed sections: none
 - Follow-up TODOs: confirm the original ratification date
 -->
@@ -111,6 +111,25 @@ Uma etapa MUST ser considerada concluída somente quando os conceitos previstos 
 implementados, o comportamento validado, os testes relevantes passando, a configuração
 documentada, as diferenças importantes registradas e o projeto preparado para a próxima etapa.
 
+### XVIII. Template Python evolutivo
+
+O template Python MUST evoluir incrementalmente dentro de uma organização coesa por responsabilidade:
+`api`, `config`, `domain`, `graph`, `llm`, `prompts` e `factory`. Componentes existentes MUST ser
+evoluídos antes da criação de responsabilidades paralelas. A implementação MUST seguir Python
+idiomático e manter `State = dados`, `Nodes = etapas de responsabilidade única`, `Services = regras
+de negócio` e `Factory = composição e injeção de dependências`.
+
+O LangGraph MUST permanecer o orquestrador do workflow, com routers e conditional edges explícitos.
+O LLM MUST interpretar linguagem natural e produzir contratos estruturados validados por Pydantic;
+regras de negócio MUST permanecer em serviços Python e texto livre do LLM MUST NOT decidir rotas ou
+executar operações de domínio. Integrações externas MUST ficar atrás de abstrações substituíveis,
+com testes determinísticos independentes de rede, credenciais e provider.
+
+Segredos MUST vir exclusivamente do ambiente. Código novo ou modificado MUST possuir docstrings em
+português para classes, funções e métodos, além de comentários didáticos nos pontos conceituais e
+decisões arquiteturais, sem comentários redundantes. `versao-typescript/` MUST permanecer somente
+como referência de leitura.
+
 ## Contexto, Escopo e Restrições
 
 Este repositório integra uma jornada prática de aprendizado em Inteligência Artificial aplicada
@@ -145,5 +164,4 @@ para novos princípios ou expansão material de orientação, e PATCH para escla
 correções não semânticas. Cada implementação, revisão ou planejamento MUST avaliar conformidade;
 descumprimentos MUST ser corrigidos ou justificados explicitamente.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): data original de adoção não fornecida | **Last Amended**: 2026-08-30
-
+**Version**: 1.1.0 | **Ratified**: TODO(RATIFICATION_DATE): data original de adoção não fornecida | **Last Amended**: 2026-09-03

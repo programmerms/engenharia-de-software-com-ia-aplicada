@@ -14,7 +14,18 @@ def appointment_data(item) -> dict[str, object]:
     return {"professional_id": item.professional_id, "professional_name": item.professional_name, "patient_name": item.patient_name, "datetime": item.datetime.isoformat(), "reason": item.reason}
 
 
-def schedule_node(state: GraphState) -> GraphState:
+def create_schedule_node(catalog):
+    """Cria o node com o serviço de domínio explicitamente injetado."""
+
+    def schedule(state: GraphState) -> GraphState:
+        """Executa a operação de agendamento no serviço recebido."""
+
+        return _schedule(state, catalog)
+
+    return schedule
+
+
+def _schedule(state: GraphState, catalog) -> GraphState:
     """Valida dados estruturados e solicita criação ao catálogo em memória.
 
     ``professional_id``, ``datetime`` e ``patient_name`` são obrigatórios para
@@ -29,7 +40,15 @@ def schedule_node(state: GraphState) -> GraphState:
             labels = {"professional_id": "professionalId", "datetime": "datetime", "patient_name": "patientName"}
             raise ValueError("Campos ausentes: " + ", ".join(labels[key] for key in missing))
         reason = str(state.get("reason") or "consulta")
-        item = state["catalog"].book(state["professional_id"], state["datetime"], state["patient_name"], reason)
+        item = catalog.book(state["professional_id"], state["datetime"], state["patient_name"], reason)
         return {"action_success": True, "appointment_data": appointment_data(item), "visited": ["schedule"]}
     except ValueError as exc:
         return {"action_success": False, "action_error": str(exc), "visited": ["schedule"]}
+
+
+def schedule_node(state: GraphState) -> GraphState:
+    """Mantém compatibilidade para chamadas antigas com catálogo no estado."""
+
+    from app.domain.services.appointment_service import default_catalog
+
+    return _schedule(state, state.get("catalog") or default_catalog())

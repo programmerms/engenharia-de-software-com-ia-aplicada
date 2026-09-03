@@ -15,4 +15,5 @@ def test_each_medical_state_is_ephemeral() -> None:
     second = create_medical_state("segunda mensagem")
     assert first["messages"][0].content == "primeira mensagem"
     assert second["messages"][0].content == "segunda mensagem"
-    assert first["catalog"] is not second["catalog"]
+    assert "catalog" not in first
+    assert "catalog" not in second

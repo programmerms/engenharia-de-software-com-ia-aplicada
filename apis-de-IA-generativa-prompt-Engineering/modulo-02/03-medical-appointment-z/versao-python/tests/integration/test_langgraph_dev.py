@@ -10,7 +10,7 @@ from collections.abc import Generator
 import httpx
 import pytest
 
-from app.graph import create_medical_state, graph
+from app.graph.graph import create_medical_state, graph
 
 
 @pytest.fixture

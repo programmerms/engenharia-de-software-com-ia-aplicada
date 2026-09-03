@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from app.graph import graph
+from app.graph.graph import graph
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = PROJECT_ROOT / "langgraph.json"
@@ -9,7 +9,7 @@ CONFIG_PATH = PROJECT_ROOT / "langgraph.json"
 def test_langgraph_config_points_to_medical_graph() -> None:
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["dependencies"] == ["."]
-    assert config["graphs"] == {"app": "./src/app/graph.py:graph"}
+    assert config["graphs"] == {"app": "./src/app/graph/graph.py:graph"}
 
 
 def test_configured_graph_is_compiled_and_invokable() -> None:
